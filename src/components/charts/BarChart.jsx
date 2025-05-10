@@ -1,63 +1,98 @@
-import { defineComponent, nextTick, onMounted } from 'vue'
-import Chart from 'chart.js/auto'
-import { randomData, months } from '../../data/charts'
+import { defineComponent, watch, ref } from 'vue'
+import { Bar } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+} from 'chart.js'
+
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 export default defineComponent({
+  name: 'BarChart',
   props: {
-    canvasID: {
+    chartId: {
       type: String,
+      required: true,
+    },
+    chartData: {
+      type: Object,
       required: true,
     },
   },
   setup(props) {
-    onMounted(() => {
-      nextTick(() => {
-        new Chart(document.getElementById(props.canvasID), {
-          type: 'bar',
-          data: {
-            labels: months,
-            datasets: [
-              {
-                data: randomData(),
-                backgroundColor: 'rgba(55, 125, 255)',
-                hoverBackgroundColor: 'rgba(55, 125, 255, 0.7)',
-                showLine: false,
-              },
-            ],
-          },
-          options: {
-            scales: {
-              yAxis: {
-                grid: {
-                  display: false,
-                },
-              },
-              xAxis: {
-                grid: {
-                  display: false,
-                },
-              },
-            },
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                display: false,
-              },
-            },
-            elements: {
-              bar: {
-                borderRadius: 5,
-              },
-            },
-          },
-        })
-      })
+    const chartData = ref({
+      labels: [],
+      datasets: [],
     })
 
+    watch(
+      () => props.chartData,
+      (newVal) => {
+        if (!newVal || !Array.isArray(newVal.datasets)) {
+          console.warn('🚨 Invalid chart data:', newVal)
+          return
+        }
+    
+        chartData.value = {
+          labels: [...newVal.labels],
+          datasets: newVal.datasets.map(ds => ({
+            ...ds,
+            data: [...ds.data],
+          })),
+        }
+      },
+      { immediate: true }
+    )
+    
+
     return () => (
-      <div class="relative">
-        <canvas id={props.canvasID}></canvas>
-      </div>
+      <Bar
+        id={props.chartId}
+        data={chartData.value}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: {
+              labels: {
+                color: '#fff',
+              },
+            },
+          },
+          scales: {
+            x: {
+              stacked: false,
+              ticks: {
+                color: '#ccc',
+              },
+              grid: {
+                color: '#333',
+              },
+            },
+            y: {
+              beginAtZero: true,
+              stacked: false,
+              ticks: {
+                color: '#ccc',
+              },
+              grid: {
+                color: '#333',
+              },
+            },
+          },
+        }}
+        height="320"
+        class="h-80"
+      />
     )
   },
 })

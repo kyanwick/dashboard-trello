@@ -24,7 +24,6 @@ export default [
   {
     path: '/trello',
     name: 'Trello',
-    component: Trello,
-    meta: { layout: AppLayout }, // optional if you want layout
+    component: Trello
   },
 ]
