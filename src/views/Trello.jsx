@@ -141,42 +141,60 @@ export default defineComponent({
         })
 
         return () => (
-            <main class="p-5">
-              <div class="flex flex-col items-start justify-between pb-6 space-y-4 border-b lg:items-center lg:space-y-0 lg:flex-row">
-                <h1 class="text-2xl font-semibold whitespace-nowrap text-yellow-400">📋 Trello Dashboard</h1>
-              </div>
-          
-              {/* Trello Stats + XP */}
-              <div class="grid grid-cols-1 gap-6 mt-6 md:grid-cols-2 lg:grid-cols-3">
-                <div class="bg-[#1c1c1c] p-4 rounded-lg shadow-md">
-                  <h2 class="text-yellow-400 font-semibold mb-4">XP by Label</h2>
-                  <XpPieChart data={labelTotals.value} />
-                </div>
-          
-                {Object.entries(trelloData.value).map(([group, lists]) => (
-                  <div class="bg-[#1c1c1c] p-4 rounded-lg shadow-md" key={group}>
-                    <h2 class="text-lg font-semibold text-yellow-400 mb-2">{group}</h2>
-                    <div class="space-y-2">
-                      {Object.entries(lists).map(([listName, cards]) => (
-                        <div class="flex justify-between items-center border-b border-gray-700 py-2" key={listName}>
-                          <span class="text-gray-300">{listName}</span>
-                          <span class="text-sm text-gray-400">{cards.length} card{cards.length !== 1 ? 's' : ''}</span>
+            <main class="p-6 bg-[#121212] min-h-screen text-white">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                    {/* Left side (2/3 width) */}
+                    <div class="col-span-1 lg:col-span-2 space-y-6">
+                        {/* XP Pie Chart */}
+                        <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md">
+                            <h2 class="text-yellow-400 font-semibold mb-2">XP by Label</h2>
+                            <XpPieChart data={labelTotals.value} />
                         </div>
-                      ))}
+
+                        {/* Weekly Archived Chart — 1.5 card tall */}
+                        <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md h-[300px] overflow-hidden">
+                            <h2 class="text-yellow-400 font-semibold mb-2">🗃️ Weekly Archived Cards</h2>
+                            <BarChart chartId="archived" chartData={archivedStats.value} />
+                        </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-          
-              {/* Weekly Archived Chart */}
-              <div class="grid grid-cols-1 gap-6 mt-6 lg:grid-cols-3">
-              <div class="bg-[#1c1c1c] p-6 rounded-lg shadow-md col-span-1 lg:col-span-3 h-[360px]">
-              <h2 class="text-yellow-400 font-semibold mb-4 text-lg">🗃️ Weekly Archived Cards</h2>
-                  <BarChart chartId="archived" chartData={archivedStats.value} />
+
+                    {/* Right side — KPI cards */}
+                    <div class="space-y-4">
+                        {Object.entries(trelloData.value).flatMap(([group, lists]) =>
+                            Object.entries(lists)
+                                .filter(([listName]) => listName !== 'On Hold')
+                                .map(([listName, cards]) => ({
+                                    title: `${group} — ${listName}`,
+                                    count: cards.length,
+                                }))
+                        ).map(({ title, count }) => (
+                            <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md flex flex-col items-center text-center" key={title}>
+                                <h2 class="text-yellow-400 font-semibold text-lg mb-2">{title}</h2>
+                                <div class="text-5xl font-bold text-white">{count}</div>
+                                <div class="text-sm text-gray-400 mt-1">task{count !== 1 ? 's' : ''}</div>
+                            </div>
+                        ))}
+
+                        {/* All On Hold Combined */}
+                        <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md flex flex-col items-center text-center">
+                            <h2 class="text-yellow-400 font-semibold text-lg mb-2">All On Hold</h2>
+                            <div class="text-5xl font-bold text-white">
+                                {
+                                    Object.values(trelloData.value)
+                                        .flatMap(lists => Object.entries(lists))
+                                        .filter(([name]) => name === 'On Hold')
+                                        .reduce((sum, [, cards]) => sum + cards.length, 0)
+                                }
+                            </div>
+                            <div class="text-sm text-gray-400 mt-1">tasks</div>
+                        </div>
+                    </div>
+
+
                 </div>
-              </div>
             </main>
-          )
-          
+
+        )
+
     },
 })

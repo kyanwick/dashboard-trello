@@ -91,7 +91,7 @@ export default defineComponent({
           },
         }}
         height="320"
-        class="h-80"
+        class="h-full"
       />
     )
   },
