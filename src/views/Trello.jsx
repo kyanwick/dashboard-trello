@@ -1,8 +1,9 @@
-import { defineComponent, ref, onMounted } from 'vue'
 import BarChart from '../components/charts/BarChart'
 import LabelTypeChart from '../components/charts/LabelTypeChart'
 import { format, startOfWeek, addDays, isWithinInterval, parseISO } from 'date-fns'
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz'
+import { defineComponent, ref, onMounted, computed } from 'vue'
+
 
 export default defineComponent({
     name: 'Trello',
@@ -204,17 +205,131 @@ export default defineComponent({
             await calculateWeeklyArchivedStats()
         }
 
+        const randomTask = ref(null)
+
+        const pickRandomTask = () => {
+            const allCards = []
+
+            for (const [board, lists] of Object.entries(trelloData.value)) {
+                for (const [list, cards] of Object.entries(lists)) {
+                    allCards.push(...cards.map(card => ({
+                        name: card.name,
+                        board,
+                        list,
+                    })))
+                }
+            }
+
+            if (allCards.length > 0) {
+                const random = allCards[Math.floor(Math.random() * allCards.length)]
+                randomTask.value = random
+            }
+        }
+
+
+        const revenueTotal = ref(0)
+
+        const fetchRevenue = async () => {
+            const cacheKey = 'revenueCache'
+            const cacheTimeKey = 'revenueCacheTime'
+            const now = Date.now()
+            const oneDay = 1000 * 60 * 60 * 24
+
+
+            const cached = localStorage.getItem(cacheKey)
+            const cachedTime = localStorage.getItem(cacheTimeKey)
+
+            if (cached && cachedTime && now - parseInt(cachedTime) < oneDay) {
+                revenueTotal.value = parseFloat(cached)
+                console.log('[Revenue] Using cached total:', revenueTotal.value)
+                return
+            }
+
+            try {
+                const res = await fetch('https://sheetdb.io/api/v1/tblb1hkl85mxw?sheet=Revenue')
+                const data = await res.json()
+
+                console.log('[Revenue] Raw data:', data)
+
+                const total = data.reduce((sum, row, index) => {
+                    const raw = row.Amount ?? row.amount ?? '0'
+                    const parsed = parseFloat(raw.toString().trim())
+                    console.log(`[Row ${index + 1}] Amount: "${raw}" → Parsed:`, parsed)
+                    return isNaN(parsed) ? sum : sum + parsed
+                }, 0)
+
+                console.log('[Revenue] Computed total:', total)
+
+                revenueTotal.value = total
+                localStorage.setItem(cacheKey, total)
+                localStorage.setItem(cacheTimeKey, now)
+            } catch (err) {
+                console.error('[Revenue] Failed to fetch:', err)
+            }
+        }
+
+
+        const expensesTotal = ref(0)
+
+        const fetchExpenses = async () => {
+            const cacheKey = 'expensesCache'
+            const cacheTimeKey = 'expensesCacheTime'
+            const now = Date.now()
+            const oneDay = 1000 * 60 * 60 * 24
+
+
+            const cached = localStorage.getItem(cacheKey)
+            const cachedTime = localStorage.getItem(cacheTimeKey)
+
+            if (cached && cachedTime && now - parseInt(cachedTime) < oneDay) {
+                expensesTotal.value = parseFloat(cached)
+                return
+            }
+
+            try {
+                const res = await fetch('https://sheetdb.io/api/v1/tblb1hkl85mxw?sheet=Expenses')
+                const data = await res.json()
+                const total = data.reduce((sum, row, index) => {
+                    const raw = row.Amount ?? row.amount ?? '0'
+                    const parsed = parseFloat(raw.toString().trim())
+                    console.log(`[Expenses Row ${index + 1}] Amount: "${raw}" → Parsed:`, parsed)
+                    return isNaN(parsed) ? sum : sum + parsed
+                }, 0)
+                
+
+
+                expensesTotal.value = total
+                localStorage.setItem(cacheKey, total)
+                localStorage.setItem(cacheTimeKey, now)
+            } catch (err) {
+                console.error('Failed to fetch expenses:', err)
+            }
+        }
+
+
+        const netTotal = computed(() => revenueTotal.value - expensesTotal.value)
+
+
         onMounted(async () => {
+            fetchRevenue()
+            fetchExpenses()
             updateClock()
             setInterval(updateClock, 1000)
 
-
             await refreshTrelloData()
+            pickRandomTask()
 
+            // Trello data refresh every 30s
             setInterval(() => {
                 refreshTrelloData()
-            }, 30000) // every 30 seconds
+            }, 30000)
+
+            // Random task update every 1 hour
+            setInterval(() => {
+                pickRandomTask()
+            }, 1000 * 60 * 60)
         })
+
 
 
         return () => (
@@ -223,7 +338,47 @@ export default defineComponent({
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     {/* Left side (2/3 width) */}
                     <div class="col-span-1 lg:col-span-2 space-y-6">
+                        <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md text-center">
+                            <h2 class="text-yellow-400 font-bold text-2xl mb-4">📊 Financial Summary</h2>
+
+                            <div class="grid grid-cols-1 gap-3 text-white">
+                                <div class="flex justify-between text-lg">
+                                    <span class="text-gray-400">💰 Revenue</span>
+                                    <span class="font-bold">${revenueTotal.value.toFixed(2)}</span>
+                                </div>
+
+                                <div class="flex justify-between text-lg">
+                                    <span class="text-gray-400">📉 Expenses</span>
+                                    <span class="font-bold text-red-400">-${expensesTotal.value.toFixed(2)}</span>
+                                </div>
+
+                                <div class="border-t border-gray-700 my-2" />
+
+                                <div class="flex justify-between text-xl font-bold">
+                                    <span class="text-yellow-400">💸 Net Profit</span>
+                                    <span class={netTotal.value >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                        ${netTotal.value.toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+
                         {/* Horizontal chart*/}
+                        <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md text-center">
+                            <h2 class="text-yellow-400 font-bold text-2xl mb-2 leading-snug">🎯 Random Task</h2>
+                            {randomTask.value ? (
+                                <>
+                                    <div class="text-xl text-white font-bold">{randomTask.value.name}</div>
+                                    <div class="text-sm text-gray-400 mt-1">
+                                        {randomTask.value.board} — {randomTask.value.list}
+                                    </div>
+                                </>
+                            ) : (
+                                <div class="text-gray-400 text-sm">No tasks available</div>
+                            )}
+                        </div>
+
                         <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md">
                             <LabelTypeChart data={labelCounts.value} />
                         </div>
