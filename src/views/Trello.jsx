@@ -104,6 +104,26 @@ export default defineComponent({
         }
 
 
+        const timeNow = ref('')
+        const dateNow = ref('')
+
+        const updateClock = () => {
+            const now = new Date()
+            timeNow.value = now.toLocaleTimeString('en-CA', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true,
+            })
+
+            dateNow.value = now.toLocaleDateString('en-CA', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+            })
+        }
+
 
 
         const calculateWeeklyArchivedStats = async () => {
@@ -185,6 +205,10 @@ export default defineComponent({
         }
 
         onMounted(async () => {
+            updateClock()
+            setInterval(updateClock, 1000)
+
+
             await refreshTrelloData()
 
             setInterval(() => {
@@ -195,6 +219,7 @@ export default defineComponent({
 
         return () => (
             <main class="p-6 bg-[#121212] min-h-screen text-white">
+
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     {/* Left side (2/3 width) */}
                     <div class="col-span-1 lg:col-span-2 space-y-6">
@@ -211,6 +236,11 @@ export default defineComponent({
 
                     {/* Right side — KPI cards */}
                     <div class="space-y-4">
+                        <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md text-center">
+                            <div class="text-yellow-400 text-5xl font-bold">{timeNow.value}</div>
+                            <div class="text-gray-300 text-lg mt-2">{dateNow.value}</div>
+                        </div>
+
                         {Object.entries(trelloData.value).flatMap(([group, lists]) =>
                             Object.entries(lists)
                                 .filter(([listName]) => listName !== 'On Hold')
@@ -220,7 +250,7 @@ export default defineComponent({
                                 }))
                         ).map(({ title, count }) => (
                             <div class="bg-[#1c1c1c] p-6 rounded-xl shadow-md flex flex-col items-center text-center" key={title}>
-                                <h2 class="text-yellow-400 font-semibold text-lg mb-2">{title}</h2>
+                                <h2 class="text-yellow-400 font-bold text-2xl mb-2 leading-snug">{title}</h2>
                                 <div class="text-5xl font-bold text-white">{count}</div>
                                 <div class="text-sm text-gray-400 mt-1">task{count !== 1 ? 's' : ''}</div>
                             </div>
