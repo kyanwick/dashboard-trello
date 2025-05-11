@@ -67,6 +67,18 @@ export default defineComponent({
                 color: '#fff',
               },
             },
+            title: {
+              display: true,
+              text: '🗃️ Weekly Archived Cards',
+              color: '#facc15',
+              font: {
+                  size: 24,
+                  weight: 'bold',
+              },
+              padding: {
+                  bottom: 16,
+              },
+          },
           },
           scales: {
             x: {

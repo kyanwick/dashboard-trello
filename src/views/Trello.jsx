@@ -1,6 +1,6 @@
 import { defineComponent, ref, onMounted } from 'vue'
-import XpPieChart from '../components/charts/XpPieChart'
 import BarChart from '../components/charts/BarChart'
+import LabelTypeChart from '../components/charts/LabelTypeChart'
 import { format, startOfWeek, addDays, isWithinInterval, parseISO } from 'date-fns'
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz'
 
@@ -32,6 +32,24 @@ export default defineComponent({
             'xp: maintenance': 20,
         }
 
+        const labelDisplayNames = {
+            'xp: deep': 'Deep Work',
+            'xp: creative': 'Creative Tasks',
+            'xp: outreach': 'Outreach',
+            'xp: content': 'Content Work',
+            'xp: maintenance': 'Maintenance',
+            'xp: life': 'Life Tasks',
+            'xp: school': 'School Tasks',
+        }
+
+        const labelColors = {
+            'Content Work': '#eab308',     // Yellow
+            'Outreach': '#f87171',         // Red
+            'Deep Work': '#34d399',        // Green
+            'School Tasks': '#60a5fa',     // Blue
+            'Maintenance': '#a78bfa',      // Purple
+        }
+
         const fetchCards = async (listId) => {
             const url = `https://api.trello.com/1/lists/${listId}/cards?key=${key}&token=${token}`
             const res = await fetch(url)
@@ -61,6 +79,32 @@ export default defineComponent({
             }
             labelTotals.value = xp
         }
+
+        const labelCounts = ref({})
+
+        const calculateLabelCounts = (allCards) => {
+            const counts = {}
+            const excludedLabels = ['priority: high', 'priority: medium', 'priority: low']
+
+            for (const group of Object.values(allCards)) {
+                for (const list of Object.values(group)) {
+                    for (const card of list) {
+                        for (const label of card.labels || []) {
+                            const raw = label.name.toLowerCase()
+                            if (excludedLabels.includes(raw)) continue
+
+                            const display = labelDisplayNames[raw] || label.name
+                            counts[display] = (counts[display] || 0) + 1
+                        }
+                    }
+                }
+            }
+
+            labelCounts.value = counts
+        }
+
+
+
 
         const calculateWeeklyArchivedStats = async () => {
             const tz = 'America/Toronto'
@@ -118,7 +162,7 @@ export default defineComponent({
         }
 
 
-        onMounted(async () => {
+        const refreshTrelloData = async () => {
             trelloData.value = {
                 'Oberas Co': {
                     'Backlog': await fetchCards(import.meta.env.VITE_TRELLO_OBERAS_BACKLOG),
@@ -136,24 +180,31 @@ export default defineComponent({
                 },
             }
 
-            calculateLabelXP(trelloData.value)
+            calculateLabelCounts(trelloData.value)
             await calculateWeeklyArchivedStats()
+        }
+
+        onMounted(async () => {
+            await refreshTrelloData()
+
+            setInterval(() => {
+                refreshTrelloData()
+            }, 30000) // every 30 seconds
         })
+
 
         return () => (
             <main class="p-6 bg-[#121212] min-h-screen text-white">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     {/* Left side (2/3 width) */}
                     <div class="col-span-1 lg:col-span-2 space-y-6">
-                        {/* XP Pie Chart */}
+                        {/* Horizontal chart*/}
                         <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md">
-                            <h2 class="text-yellow-400 font-semibold mb-2">XP by Label</h2>
-                            <XpPieChart data={labelTotals.value} />
+                            <LabelTypeChart data={labelCounts.value} />
                         </div>
 
                         {/* Weekly Archived Chart — 1.5 card tall */}
-                        <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md h-[300px] overflow-hidden">
-                            <h2 class="text-yellow-400 font-semibold mb-2">🗃️ Weekly Archived Cards</h2>
+                        <div class="bg-[#1c1c1c] p-4 rounded-xl shadow-md">
                             <BarChart chartId="archived" chartData={archivedStats.value} />
                         </div>
                     </div>
